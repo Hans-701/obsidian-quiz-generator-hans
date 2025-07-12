@@ -15,8 +15,11 @@ import FolderViewerModal from "./folderViewerModal";
 import GeneratorFactory from "../../generators/generatorFactory";
 import QuizModalLogic from "../quiz/quizModalLogic";
 import { cleanUpNoteContents } from "../../utils/markdownCleaner";
-import { countNoteTokens, setIconAndTooltip } from "../../utils/helpers";
+import { countNoteTokens, detectEmbeddedFiles, setIconAndTooltip } from "../../utils/helpers";
 import { Provider } from "../../generators/providers";
+import { QuizNameModal } from "./QuizNameModal";
+import { FileSelectionModal } from "./FileSelectionModal";
+import { FileProcessor } from "../../processors/FileProcessor";
 
 const enum SelectorModalButton {
 	CLEAR,
@@ -37,10 +40,12 @@ export default class SelectorModal extends Modal {
 	private promptTokens: number = 0;
 	private readonly buttonMap: Record<SelectorModalButton, HTMLButtonElement>;
 	private quiz: QuizModalLogic | undefined;
+	private readonly fileProcessor: FileProcessor;
 
 	constructor(app: App, settings: QuizSettings) {
 		super(app);
 		this.settings = settings;
+		this.fileProcessor = new FileProcessor(this.app);
 		this.notePaths = this.app.vault.getMarkdownFiles().map(file => file.path);
 		this.folderPaths = this.app.vault.getAllFolders(true).map(folder => folder.path);
 		this.scope = new Scope(this.app.scope);
@@ -88,62 +93,64 @@ export default class SelectorModal extends Modal {
 			this.selectedNotes.clear();
 			this.selectedNoteFiles.clear();
 			this.itemContainer.empty();
-			this.updatePromptTokens(0);
+			this.updatePromptTokens(0, true);
 			this.notePaths = this.app.vault.getMarkdownFiles().map(file => file.path);
 			this.folderPaths = this.app.vault.getAllFolders(true).map(folder => folder.path);
 		};
 		const openQuizHandler = async (): Promise<void> => await this.quiz?.renderQuiz();
 		const addNoteHandler = (): void => this.openNoteSelector();
 		const addFolderHandler = (): void => this.openFolderSelector();
-		const generateQuizHandler = async (): Promise<void> => {
+		const generateQuizHandler = (): void => {
 			if (!this.validGenerationSettings()) {
 				new Notice("Invalid generation settings or prompt contains 0 tokens");
 				return;
 			}
 
-			this.toggleButtons([SelectorModalButton.GENERATE], true);
+			new QuizNameModal(this.app, async (quizName) => {
+				this.toggleButtons([SelectorModalButton.GENERATE], true);
 
-			try {
-				new Notice("Generating...");
-				const generator = GeneratorFactory.createInstance(this.settings);
-				const generatedQuestions = await generator.generateQuiz([...this.selectedNotes.values()]);
-				if (generatedQuestions === null) {
-					this.toggleButtons([SelectorModalButton.GENERATE], false);
-					new Notice("Error: Generation returned nothing");
-					return;
-				}
-
-				const quiz: Quiz = JSON.parse(generatedQuestions.replace(/\\+/g, "\\\\"));
-				const questions: Question[] = [];
-				quiz.questions.forEach(question => {
-					if (isTrueFalse(question)) {
-						questions.push(question);
-					} else if (isMultipleChoice(question)) {
-						questions.push(question);
-					} else if (isSelectAllThatApply(question)) {
-						questions.push(question);
-					} else if (isFillInTheBlank(question)) {
-						const normalizeBlanks = (str: string): string => {
-							return this.settings.provider !== Provider.COHERE ? str : str.replace(/_{2,}|\$_{2,}\$/g, "`____`");
-						};
-						questions.push({ question: normalizeBlanks(question.question), answer: question.answer });
-					} else if (isMatching(question)) {
-						questions.push(question);
-					} else if (isShortOrLongAnswer(question)) {
-						questions.push(question);
-					} else {
-						new Notice("A question was generated incorrectly");
+				try {
+					new Notice("Generating...");
+					const generator = GeneratorFactory.createInstance(this.settings);
+					const generatedQuestions = await generator.generateQuiz([...this.selectedNotes.values()]);
+					if (generatedQuestions === null) {
+						this.toggleButtons([SelectorModalButton.GENERATE], false);
+						new Notice("Error: Generation returned nothing");
+						return;
 					}
-				});
 
-				this.quiz = new QuizModalLogic(this.app, this.settings, questions, [...this.selectedNoteFiles.values()].flat());
-				await this.quiz.renderQuiz();
-				this.toggleButtons([SelectorModalButton.QUIZ], false);
-			} catch (error) {
-				new Notice((error as Error).message, 0);
-			} finally {
-				this.toggleButtons([SelectorModalButton.GENERATE], false);
-			}
+					const quiz: Quiz = JSON.parse(generatedQuestions.replace(/\\+/g, "\\\\"));
+					const questions: Question[] = [];
+					quiz.questions.forEach(question => {
+						if (isTrueFalse(question)) {
+							questions.push(question);
+						} else if (isMultipleChoice(question)) {
+							questions.push(question);
+						} else if (isSelectAllThatApply(question)) {
+							questions.push(question);
+						} else if (isFillInTheBlank(question)) {
+							const normalizeBlanks = (str: string): string => {
+								return this.settings.provider !== Provider.COHERE ? str : str.replace(/_{2,}|\$_{2,}\$/g, "`____`");
+							};
+							questions.push({ question: normalizeBlanks(question.question), answer: question.answer });
+						} else if (isMatching(question)) {
+							questions.push(question);
+						} else if (isShortOrLongAnswer(question)) {
+							questions.push(question);
+						} else {
+							new Notice("A question was generated incorrectly");
+						}
+					});
+
+					this.quiz = new QuizModalLogic(this.app, this.settings, questions, [...this.selectedNoteFiles.values()].flat(), quizName);
+					await this.quiz.renderQuiz();
+					this.toggleButtons([SelectorModalButton.QUIZ], false);
+				} catch (error) {
+					new Notice((error as Error).message, 0);
+				} finally {
+					this.toggleButtons([SelectorModalButton.GENERATE], false);
+				}
+			}).open();
 		};
 
 		clearButton.addEventListener("click", clearHandler);
@@ -156,118 +163,147 @@ export default class SelectorModal extends Modal {
 	}
 
 	private openNoteSelector(): void {
-		const selector = new NoteAndFolderSelector(this.app, this.notePaths, this.modalEl, this.addNote.bind(this));
-		selector.open();
+		new NoteAndFolderSelector(this.app, this.notePaths, this.modalEl, (selectedItem) => {
+			this.addFileToQuizContext(this.app.vault.getAbstractFileByPath(selectedItem) as TFile);
+		}).open();
 	}
 
 	private openFolderSelector(): void {
-		const selector = new NoteAndFolderSelector(this.app, this.folderPaths, this.modalEl, this.addFolder.bind(this));
-		selector.open();
-	}
-
-	private async addNote(note: string): Promise<void> {
-		const selectedNote = this.app.vault.getAbstractFileByPath(note);
-		if (selectedNote instanceof TFile) {
-			this.notePaths = this.notePaths.filter(notePath => notePath !== selectedNote.path);
-			this.openNoteSelector();
-			const noteContents = await this.app.vault.cachedRead(selectedNote);
-			this.selectedNotes.set(selectedNote.path, cleanUpNoteContents(noteContents, getFrontMatterInfo(noteContents).exists));
-			this.selectedNoteFiles.set(selectedNote.path, [selectedNote]);
-			this.renderNote(selectedNote);
-		}
-	}
-
-	private async addFolder(folder: string): Promise<void> {
-		const selectedFolder = this.app.vault.getAbstractFileByPath(folder);
-		if (selectedFolder instanceof TFolder) {
-			this.folderPaths = this.folderPaths.filter(folderPath => folderPath !== selectedFolder.path);
-			this.openFolderSelector();
-
-			const folderContents: string[] = [];
-			const notes: TFile[] = [];
-			const promises: Promise<void>[] = [];
-			Vault.recurseChildren(selectedFolder, (file: TAbstractFile): void => {
-				if (file instanceof TFile && file.extension === "md" &&
-					(this.settings.includeSubfolderNotes || file.parent?.path === selectedFolder.path)) {
-					promises.push(
-						(async (): Promise<void> => {
-							const noteContents = await this.app.vault.cachedRead(file);
-							folderContents.push(cleanUpNoteContents(noteContents, getFrontMatterInfo(noteContents).exists));
-							notes.push(file);
-						})()
-					);
+		new NoteAndFolderSelector(this.app, this.folderPaths, this.modalEl, (selectedItem) => {
+			const folder = this.app.vault.getAbstractFileByPath(selectedItem) as TFolder;
+			const notesInFolder: TFile[] = [];
+			Vault.recurseChildren(folder, (file) => {
+				if (file instanceof TFile && file.extension === "md") {
+					if (this.settings.includeSubfolderNotes || file.parent?.path === folder.path) {
+						notesInFolder.push(file);
+					}
 				}
 			});
+			this.addFileToQuizContext(folder, notesInFolder);
+		}).open();
+	}
 
-			await Promise.all(promises);
-			this.selectedNotes.set(selectedFolder.path, folderContents.join(" "));
-			this.selectedNoteFiles.set(selectedFolder.path, notes);
-			this.renderFolder(selectedFolder);
+	private async addFileToQuizContext(item: TFile | TFolder, filesInFolder: TFile[] = []) {
+		if (this.selectedNotes.has(item.path)) {
+			new Notice(`"${item.name}" has already been added.`);
+			return;
+		}
+
+		if (item instanceof TFile) {
+			this.notePaths = this.notePaths.filter(path => path !== item.path);
+		} else {
+			this.folderPaths = this.folderPaths.filter(path => path !== item.path);
+		}
+
+		this.renderItem(item); // Dibuja el item inmediatamente
+
+		let totalContent = "";
+		let allEmbeddedFiles: string[] = [];
+
+		if (item instanceof TFile) {
+			this.selectedNoteFiles.set(item.path, [item]);
+			const rawContent = await this.app.vault.cachedRead(item);
+			totalContent = cleanUpNoteContents(rawContent, getFrontMatterInfo(rawContent).exists);
+			allEmbeddedFiles.push(...detectEmbeddedFiles(rawContent, this.app, item.path));
+		} else if (item instanceof TFolder) {
+			this.selectedNoteFiles.set(item.path, filesInFolder);
+			const allContents = await Promise.all(filesInFolder.map(async (file) => {
+				const rawContent = await this.app.vault.cachedRead(file);
+				allEmbeddedFiles.push(...detectEmbeddedFiles(rawContent, this.app, file.path));
+				return cleanUpNoteContents(rawContent, getFrontMatterInfo(rawContent).exists);
+			}));
+			totalContent = allContents.join(" ");
+		}
+
+		this.selectedNotes.set(item.path, totalContent);
+		this.updateTokensForItem(item.path, totalContent);
+
+		const uniqueEmbeddedFiles = [...new Set(allEmbeddedFiles)];
+		if (uniqueEmbeddedFiles.length > 0) {
+			new FileSelectionModal(this.app, uniqueEmbeddedFiles, (selected) => {
+				this.processAndAddEmbeddedFiles(selected);
+			}).open();
 		}
 	}
 
-	private renderNote(note: TFile): void {
-		const tokens = this.renderNoteOrFolder(note, this.settings.showNotePath ? note.path : note.basename);
-		this.toggleButtons([SelectorModalButton.CLEAR, SelectorModalButton.GENERATE], false);
-		this.updatePromptTokens(this.promptTokens + tokens);
-	}
-
-	private renderFolder(folder: TFolder): void {
-		let folderName = this.settings.showFolderPath ? folder.path : folder.name;
-		if (folder.path === "/") {
-			folderName = this.app.vault.getName() + " (Vault)";
+private async processAndAddEmbeddedFiles(fileNames: string[]) {
+	for (const fileName of fileNames) {
+		console.log("Trying to add embedded file:", fileName);
+		const file = this.app.vault.getAbstractFileByPath(fileName);
+		if (file instanceof TFile) {
+			await this.addFileToQuizContext(file);
+		} else {
+			new Notice(`Embedded file not found: ${fileName}`);
+			console.warn("Embedded file not found:", fileName);
 		}
-
-		const tokens = this.renderNoteOrFolder(folder, folderName);
-		this.toggleButtons([SelectorModalButton.CLEAR, SelectorModalButton.GENERATE], false);
-		this.updatePromptTokens(this.promptTokens + tokens);
 	}
+}
 
-	private renderNoteOrFolder(item: TFile | TFolder, fileName: string): number {
-		const itemContainer = this.itemContainer.createDiv("item-qg");
-		itemContainer.textContent = fileName;
+	private renderItem(item: TFile | TFolder): void {
+		const itemEl = this.itemContainer.createDiv({ cls: "item-qg" });
+		itemEl.setAttribute("data-path", item.path);
+		itemEl.createSpan({ text: (this.settings.showNotePath || this.settings.showFolderPath) ? item.path : item.name });
 
-		const tokensElement = itemContainer.createDiv("item-tokens-qg");
-		const tokens = countNoteTokens(this.selectedNotes.get(item.path)!);
-		tokensElement.textContent = tokens + " tokens";
+		const tokensEl = itemEl.createDiv({ cls: "item-tokens-qg" });
+		tokensEl.textContent = "Loading...";
 
-		const viewContentsButton = itemContainer.createEl("button", "item-button-qg");
-		setIconAndTooltip(viewContentsButton, "eye", "View contents");
-		viewContentsButton.addEventListener("click", async (): Promise<void> => {
-			if (item instanceof TFile) {
-				new NoteViewerModal(this.app, item, this.modalEl).open();
-			} else {
-				new FolderViewerModal(this.app, this.settings, this.modalEl, item).open();
-			}
+		const buttonContainer = itemEl.createDiv();
+		const viewButton = buttonContainer.createEl("button", { cls: "item-button-qg" });
+		setIconAndTooltip(viewButton, "eye", "View contents");
+		viewButton.addEventListener("click", (e) => {
+			e.stopPropagation();
+			if (item instanceof TFile) new NoteViewerModal(this.app, item, this.modalEl).open();
+			else new FolderViewerModal(this.app, this.settings, this.modalEl, item).open();
 		});
 
-		const removeButton = itemContainer.createEl("button", "item-button-qg");
+		const removeButton = buttonContainer.createEl("button", { cls: "item-button-qg" });
 		setIconAndTooltip(removeButton, "x", "Remove");
-		removeButton.addEventListener("click", (): void => {
-			this.removeNoteOrFolder(item, itemContainer);
-			this.updatePromptTokens(this.promptTokens - tokens);
-
-			if (this.selectedNotes.size === 0) {
-				this.toggleButtons([SelectorModalButton.CLEAR, SelectorModalButton.GENERATE], true);
-			}
+		removeButton.addEventListener("click", (e) => {
+			e.stopPropagation();
+			const tokensToSubtract = countNoteTokens(this.selectedNotes.get(item.path) || "");
+			this.removeNoteOrFolder(item, itemEl);
+			this.updatePromptTokens(-tokensToSubtract);
 		});
 
-		return tokens;
+		this.toggleButtons([SelectorModalButton.CLEAR, SelectorModalButton.GENERATE], false);
+	}
+
+	private updateTokensForItem(path: string, content: string): void {
+		const itemEl = this.itemContainer.querySelector(`[data-path="${path.replace(/"/g, '\\"')}"]`);
+		if (itemEl) {
+			const tokensEl = itemEl.querySelector(".item-tokens-qg") as HTMLDivElement;
+			if (tokensEl) {
+				const newTokens = countNoteTokens(content);
+				tokensEl.textContent = newTokens + " tokens";
+				this.updatePromptTokens(newTokens);
+			}
+		}
 	}
 
 	private removeNoteOrFolder(item: TFile | TFolder, element: HTMLDivElement): void {
 		this.selectedNotes.delete(item.path);
 		this.selectedNoteFiles.delete(item.path);
-		this.itemContainer.removeChild(element);
-		item instanceof TFile ? this.notePaths.push(item.path) : this.folderPaths.push(item.path);
+		element.remove();
+		if (item instanceof TFile && !this.notePaths.includes(item.path)) {
+			this.notePaths.push(item.path);
+		} else if (item instanceof TFolder && !this.folderPaths.includes(item.path)) {
+			this.folderPaths.push(item.path);
+		}
+		if (this.selectedNotes.size === 0) {
+			this.toggleButtons([SelectorModalButton.CLEAR, SelectorModalButton.GENERATE], true);
+		}
 	}
 
 	private toggleButtons(buttons: SelectorModalButton[], disabled: boolean): void {
 		buttons.forEach(button => this.buttonMap[button].disabled = disabled);
 	}
 
-	private updatePromptTokens(tokens: number): void {
-		this.promptTokens = tokens;
+	private updatePromptTokens(tokens: number, absolute = false): void {
+		if (absolute) {
+			this.promptTokens = tokens;
+		} else {
+			this.promptTokens += tokens;
+		}
 		this.tokenContainer.textContent = "Prompt tokens: " + this.promptTokens;
 	}
 

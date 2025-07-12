@@ -1,4 +1,4 @@
-import { setIcon, setTooltip } from "obsidian";
+import { App, setIcon, setTooltip } from "obsidian";
 
 export const shuffleArray = <T>(array: T[]): T[] => {
 	const newArray = [...array];
@@ -30,4 +30,21 @@ export const cosineSimilarity = (vec1: number[], vec2: number[]): number => {
 	const mag1 = magnitude(vec1);
 	const mag2 = magnitude(vec2);
 	return dot / (mag1 * mag2);
+};
+
+// La función ahora usa la API oficial de Obsidian para resolver los enlaces,
+// lo que funciona para CUALQUIER tipo de archivo (PDF, PNG, MD, etc.).
+export const detectEmbeddedFiles = (content: string, app: App, sourcePath: string): string[] => {
+    const embeddedFileRegex = /!\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g;
+    const matches = [...content.matchAll(embeddedFileRegex)];
+    const filePaths: string[] = [];
+
+    for (const match of matches) {
+        const linktext = match[1];
+        const file = app.metadataCache.getFirstLinkpathDest(linktext, sourcePath);
+        if (file) {
+            filePaths.push(file.path);
+        }
+    }
+    return filePaths;
 };

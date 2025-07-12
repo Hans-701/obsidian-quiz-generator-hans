@@ -16,13 +16,15 @@ export default class QuizSaver {
 	private readonly app: App;
 	private readonly settings: QuizSettings;
 	private readonly quizSources: TFile[];
+	private readonly quizName: string;
 	private readonly saveFilePath: string;
 	private readonly validSavePath: boolean;
 
-	constructor(app: App, settings: QuizSettings, quizSources: TFile[]) {
+	constructor(app: App, settings: QuizSettings, quizSources: TFile[], quizName: string) {
 		this.app = app;
 		this.settings = settings;
 		this.quizSources = quizSources;
+		this.quizName = quizName;
 		this.saveFilePath = this.getSaveFilePath();
 		this.validSavePath = this.app.vault.getAbstractFileByPath(this.settings.savePath) instanceof TFolder;
 	}
@@ -64,24 +66,21 @@ export default class QuizSaver {
 		}
 	}
 
-	private getFileNames(folder: TFolder): string[] {
-		return folder.children
-			.filter(file => file instanceof TFile)
-			.map(file => file.name.toLowerCase())
-			.filter(name => name.startsWith("quiz"));
-	}
-
 	private getSaveFilePath(): string {
-		let count = 1;
 		const saveFolder = this.app.vault.getAbstractFileByPath(this.settings.savePath);
-		const validSavePath = saveFolder instanceof TFolder;
-		const fileNames = validSavePath ? this.getFileNames(saveFolder) : this.getFileNames(this.app.vault.getRoot());
+		const folderPath = saveFolder instanceof TFolder ? this.settings.savePath : "/";
 
-		while (fileNames.includes(`quiz ${count}.md`)) {
+		let fileName = `${this.quizName}.md`;
+		let count = 1;
+		let fileExists = this.app.vault.getAbstractFileByPath(normalizePath(`${folderPath}/${fileName}`)) instanceof TFile;
+
+		while (fileExists) {
+			fileName = `${this.quizName} (${count}).md`;
 			count++;
+			fileExists = this.app.vault.getAbstractFileByPath(normalizePath(`${folderPath}/${fileName}`)) instanceof TFile;
 		}
 
-		return validSavePath ? normalizePath(`${this.settings.savePath}/Quiz ${count}.md`) : `Quiz ${count}.md`;
+		return normalizePath(`${folderPath}/${fileName}`);
 	}
 
 	private async getSaveFile(): Promise<TFile> {

@@ -22,6 +22,29 @@ https://github.com/user-attachments/assets/22770da4-af69-412c-ae05-1aae0fff4a10
 - **Multi-Language Support:** Generate questions in 22 different languages.
 - **Math Support:** Generate questions from notes containing LaTeX.
 
+## ✨ New Features Implemented
+
+We've added a series of quality-of-life improvements to make quiz generation more powerful, customizable, and efficient!
+
+### 📝 Custom File Names for Your Quizzes
+
+Say goodbye to generic names like "Quiz 1"! Now, right before generating a new quiz, the plugin will prompt you to give it a **unique name**. The saved `.md` file will use this name, allowing you to organize and find your quizzes much more intuitively.
+
+### 🧠 Embedded Note Detection and Inclusion
+
+Do you use embed links like `![[Another Note]]` to organize your knowledge? Now the plugin is smarter!
+
+- **Automatic Detection:** When you add a note for quiz generation, the plugin will scan its content and **automatically detect all the notes you have embedded** within it.
+    
+- **Interactive Selection:** You will be presented with a modal window so you can **choose which of those embedded notes you want to add** to the quiz context. This gives you granular control over your study material, allowing you to easily include related information.
+    
+
+### ⚙️ Token Optimization and Efficient Processing
+
+We have improved the plugin's internal engine to be smarter and more efficient with token usage, which translates to cost savings and higher quality questions.
+
+- **Advanced Markdown Cleaning:** Before sending your notes to the AI, we now remove formatting elements that don't add semantic value, such as color HTML tags (`<font>`). This reduces "noise" and allows the AI to focus on what really matters: the content of your notes.
+
 ## Supported Providers
 
 You can use any of the following providers for both **quiz generation** and **answer evaluation**:
