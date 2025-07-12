@@ -15,12 +15,22 @@ https://github.com/user-attachments/assets/22770da4-af69-412c-ae05-1aae0fff4a10
 - **Multiple Question Types:** Supports true or false, multiple choice, select all that apply, fill in the blank, matching, short answer, and long answer.
 - **Intelligent Evaluation System:** Instead of a simple text comparison, short and long answer questions are evaluated by an AI provider of your choice (OpenAI, Google, OpenRouter, etc.), providing a percentage score and detailed feedback.
 - **Custom Quiz UI:** Answer questions in an interactive UI that provides real-time feedback on your responses.
+- **Exam Mode:** Take quizzes under timed conditions with a final score and detailed results breakdown at the end.
 - **Question Saving:** Save questions in various formats.
   - Inline and multiline flashcards compatible with [obsidian-spaced-repetition](https://github.com/st3v3nmw/obsidian-spaced-repetition).
   - Markdown callouts for easy integration into your notes.
 - **Review and Create:** Review saved questions using the quiz UI or create your own questions from scratch without ever using the generator.
 - **Multi-Language Support:** Generate questions in 22 different languages.
 - **Math Support:** Generate questions from notes containing LaTeX.
+
+## 🚀 ¡Nuevo! Modo Examen
+
+¡Pon a prueba tus conocimientos con el nuevo **Modo Examen**! Esta función transforma cualquier cuestionario en una verdadera evaluación, ideal para prepararse para exámenes reales.
+
+- **Evaluación Final:** Responde todas las preguntas sin recibir retroalimentación inmediata. Al finalizar, obtendrás una puntuación total y un desglose detallado de tus aciertos y errores.
+- **Límite de Tiempo:** Desde el menú de configuración, puedes establecer un límite de tiempo en minutos. Si el tiempo se agota, el examen finalizará automáticamente y se calificarán las respuestas que hayas completado.
+- **Resultados Detallados:** Al terminar, una ventana emergente te mostrará tu puntuación, tus respuestas, las respuestas correctas y el feedback de la IA para las preguntas abiertas.
+- **Guardado de Resultados:** Con un solo clic, puedes guardar un informe completo del examen en formato Markdown en la carpeta que elijas.
 
 ## ✨ New Features Implemented
 
@@ -71,7 +81,8 @@ This plugin is now available in the **Community plugins** page in Obsidian.
     -   Select **Enable** on the plugin page or go back to the **Community plugins** page and toggle the switch.
 2.  Open the plugin settings. Under the **Model** section, enter your API key for the provider you want to use for **quiz generation**.
 3.  Go to the new **Evaluation** section. Select the provider you want to use for **grading answers** and configure its settings.
-4.  Configure the other settings as desired.
+4.  Under the **Saving** section, you can now configure the **Exam Mode** settings, including enabling the feature, setting a time limit, and choosing a folder for the results.
+5.  Configure the other settings as desired.
 
 ### Generation
 
@@ -83,19 +94,22 @@ This plugin is now available in the **Community plugins** page in Obsidian.
 - Once you've added your notes and/or folders, select the [webhook](https://lucide.dev/icons/webhook) icon to generate the questions.
   - The quiz UI will open automatically when the generation is complete.
 
+### Taking a Quiz
+
+- When opening a quiz (either newly generated or from a file), a modal will ask if you want to use **Normal Mode** or **Exam Mode**.
+  - **Normal Mode:** Provides immediate feedback after each question.
+  - **Exam Mode:** Hides feedback until the end, where you receive a final score and a complete review.
+
 ### Saving
 
-- Saved questions will be in a Markdown file named "Quiz [number]" in the folder specified by the "Save location" setting.
+- Saved questions will be in a Markdown file named after the quiz in the folder specified by the "Save location" setting.
+- Saved exam results will be in a separate Markdown file in the folder specified in the "Exam Mode" settings.
 - Select the [save](https://lucide.dev/icons/save) icon to save the current question.
 - Select the [save-all](https://lucide.dev/icons/save-all) icon to save all questions.
 
 ### Reviewing Saved Quizzes
 
 - Open the command palette and select "Quiz Generator: Open quiz from active note" or right-click a note in the file explorer and select "Open quiz from this note" in the file menu.
-
-### Miscellaneous
-
-- Select the [scroll](https://lucide.dev/icons/scroll-text) icon in the generator UI to re-open the most recently generated quiz.
 
 ### Manually Creating or Modifying Questions
 

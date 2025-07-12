@@ -1,3 +1,5 @@
+// src/services/quizReviewer.ts
+
 import { App, Notice, TFile } from "obsidian";
 import { QuizSettings } from "../settings/config";
 import {
@@ -32,12 +34,18 @@ export default class QuizReviewer {
 		this.spacedRepetitionParser(fileContents);
 
 		if (this.quiz.length > 0) {
-			await new QuizModalLogic(this.app, this.settings, this.quiz, []).renderQuiz();
+			// --- INICIO DE LA MODIFICACIÓN ---
+			// Ahora pasamos el nombre base del archivo como el nombre del quiz.
+			await new QuizModalLogic(this.app, this.settings, this.quiz, [], file.basename).renderQuiz();
+			// --- FIN DE LA MODIFICACIÓN ---
 		} else {
 			new Notice("No questions in this note");
 		}
 	}
-
+    
+    // ... el resto del archivo permanece igual ...
+    // ... (calloutParser, spacedRepetitionParser, etc.) ...
+    
 	private calloutParser(fileContents: string): void {
 		const questionCallout = />\s*\[!question][+-]?\s*(.+)\s*/;
 		const answerCallout = />\s*>\s*\[!success].*\s*/;

@@ -35,16 +35,16 @@ export const cosineSimilarity = (vec1: number[], vec2: number[]): number => {
 // La función ahora usa la API oficial de Obsidian para resolver los enlaces,
 // lo que funciona para CUALQUIER tipo de archivo (PDF, PNG, MD, etc.).
 export const detectEmbeddedFiles = (content: string, app: App, sourcePath: string): string[] => {
-    const embeddedFileRegex = /!\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g;
-    const matches = [...content.matchAll(embeddedFileRegex)];
-    const filePaths: string[] = [];
+	const embeddedFileRegex = /!\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g;
+	const matches = [...content.matchAll(embeddedFileRegex)];
+	const filePaths: string[] = [];
 
-    for (const match of matches) {
-        const linktext = match[1];
-        const file = app.metadataCache.getFirstLinkpathDest(linktext, sourcePath);
-        if (file) {
-            filePaths.push(file.path);
-        }
-    }
-    return filePaths;
+	for (const match of matches) {
+		const linktext = match[1];
+		const file = app.metadataCache.getFirstLinkpathDest(linktext, sourcePath);
+		if (file && file.path.toLowerCase().endsWith('.md')) {
+			filePaths.push(file.path);
+		}
+	}
+	return filePaths;
 };

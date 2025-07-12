@@ -1,3 +1,5 @@
+// src/ui/quiz/FillInTheBlankQuestion.tsx
+
 import { App, Component, MarkdownRenderer } from "obsidian";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { FillInTheBlank } from "../../utils/types";
@@ -18,14 +20,15 @@ const MarkdownSpan = ({ text, app, component }: { text: string; app: App; compon
 interface FillInTheBlankQuestionProps {
 	app: App;
 	question: FillInTheBlank;
+	isExamMode: boolean; // <-- AÑADIDO
+	onAnswer: (answer: string[]) => void; // <-- AÑADIDO
 }
 
-const FillInTheBlankQuestion = ({ app, question }: FillInTheBlankQuestionProps) => {
+const FillInTheBlankQuestion = ({ app, question, isExamMode, onAnswer }: FillInTheBlankQuestionProps) => {
 	const [userAnswers, setUserAnswers] = useState<string[]>(Array(question.answer.length).fill(""));
 	const [submitted, setSubmitted] = useState<boolean>(false);
 	const component = useMemo(() => new Component(), [question.question]);
 
-	// Split the question into parts based on the blank placeholder
 	const questionParts = useMemo(() => question.question.split(/`_+`/g), [question.question]);
 
 	const handleInputChange = (index: number, value: string) => {
@@ -35,11 +38,15 @@ const FillInTheBlankQuestion = ({ app, question }: FillInTheBlankQuestionProps) 
 	};
 
 	const handleSubmit = () => {
-		setSubmitted(true);
+		if (isExamMode) {
+			onAnswer(userAnswers);
+		} else {
+			setSubmitted(true);
+		}
 	};
 
 	const getInputClass = (index: number) => {
-		if (!submitted) {
+		if (!submitted || isExamMode) { // No mostrar colores en modo examen
 			return "fill-in-the-blank-input-qg";
 		}
 		const isCorrect = userAnswers[index].trim().toLowerCase() === question.answer[index].toLowerCase();
@@ -58,9 +65,9 @@ const FillInTheBlankQuestion = ({ app, question }: FillInTheBlankQuestionProps) 
 							<input
 								type="text"
 								className={getInputClass(index)}
-								value={submitted ? question.answer[index] : userAnswers[index]}
+								value={submitted && !isExamMode ? question.answer[index] : userAnswers[index]}
 								onChange={(e) => handleInputChange(index, e.target.value)}
-								readOnly={submitted}
+								readOnly={submitted && !isExamMode}
 								size={Math.max(question.answer[index].length, 5) + 2}
 								autoCapitalize="off"
 							/>
@@ -73,13 +80,13 @@ const FillInTheBlankQuestion = ({ app, question }: FillInTheBlankQuestionProps) 
 				<button
 					className="submit-answer-qg"
 					onClick={handleSubmit}
-					disabled={submitted}
+					disabled={submitted && !isExamMode}
 				>
-					{submitted ? "Answered" : "Submit"}
+					{isExamMode ? "Siguiente" : "Submit"}
 				</button>
-				{!submitted && (
+				{(!submitted || isExamMode) && (
 					<div className="instruction-footnote-qg">
-						Fill in the blanks and press submit to check your answers.
+						Rellena los espacios y presiona el botón para continuar.
 					</div>
 				)}
 			</div>

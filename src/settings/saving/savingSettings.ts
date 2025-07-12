@@ -79,6 +79,50 @@ const displaySavingSettings = (containerEl: HTMLElement, plugin: QuizGenerator):
 					await plugin.saveSettings();
 				})
 		);
+        
+    // --- INICIO DEL CÓDIGO AÑADIDO ---
+    new Setting(containerEl).setName("Modo Examen").setHeading();
+
+    new Setting(containerEl)
+        .setName("Activar Modo Examen")
+        .setDesc("Si está activado, se preguntará si se desea iniciar en modo examen al abrir un cuestionario.")
+        .addToggle(toggle =>
+            toggle
+                .setValue(plugin.settings.examModeEnabled)
+                .onChange(async (value) => {
+                    plugin.settings.examModeEnabled = value;
+                    await plugin.saveSettings();
+                })
+        );
+
+    new Setting(containerEl)
+        .setName("Límite de Tiempo (minutos)")
+        .setDesc("Establece el límite de tiempo para los exámenes. Usa 0 para tiempo ilimitado.")
+        .addText(text =>
+            text
+                .setValue(plugin.settings.examTimeLimit.toString())
+                .onChange(async (value) => {
+                    const numValue = parseInt(value, 10);
+                    if (!isNaN(numValue) && numValue >= 0) {
+                        plugin.settings.examTimeLimit = numValue;
+                        await plugin.saveSettings();
+                    }
+                })
+        );
+
+    new Setting(containerEl)
+        .setName("Carpeta para Resultados de Examen")
+        .setDesc("Ruta a la carpeta donde se guardarán los resultados de los exámenes.")
+        .addSearch(search => {
+            new FolderSuggester(plugin.app, search.inputEl);
+            search
+                .setValue(plugin.settings.examResultsPath)
+                .onChange(async (value) => {
+                    plugin.settings.examResultsPath = normalizePath(value.trim());
+                    await plugin.saveSettings();
+                })
+        });
+    // --- FIN DEL CÓDIGO AÑADIDO ---
 };
 
 export default displaySavingSettings;

@@ -1,3 +1,5 @@
+// src/ui/quiz/TrueFalseQuestion.tsx
+
 import { App, Component, MarkdownRenderer } from "obsidian";
 import { useEffect, useRef, useState } from "react";
 import { TrueFalse } from "../../utils/types";
@@ -5,23 +7,42 @@ import { TrueFalse } from "../../utils/types";
 interface TrueFalseQuestionProps {
 	app: App;
 	question: TrueFalse;
+	isExamMode: boolean; // <-- AÑADIDO
+	onAnswer: (answer: boolean) => void; // <-- AÑADIDO
 }
 
-const TrueFalseQuestion = ({ app, question }: TrueFalseQuestionProps) => {
+const TrueFalseQuestion = ({ app, question, isExamMode, onAnswer }: TrueFalseQuestionProps) => {
 	const [userAnswer, setUserAnswer] = useState<boolean | null>(null);
 	const questionRef = useRef<HTMLDivElement>(null);
+	const component = useRef(new Component()).current;
 
 	useEffect(() => {
-		const component = new Component();
-
-		question.question.split("\\n").forEach(questionFragment => {
-			if (questionRef.current) {
-				MarkdownRenderer.render(app, questionFragment, questionRef.current, "", component);
-			}
-		});
+		if (questionRef.current) {
+			questionRef.current.empty(); // Limpiar antes de renderizar
+			question.question.split("\\n").forEach(questionFragment => {
+				if (questionRef.current) {
+					MarkdownRenderer.render(app, questionFragment, questionRef.current, "", component);
+				}
+			});
+		}
+		// Limpiar el componente al desmontar para evitar fugas de memoria
+		return () => {
+			component.unload();
+		};
 	}, [app, question]);
+	
+	const handleAnswer = (answer: boolean) => {
+		if (isExamMode) {
+			onAnswer(answer);
+		} else {
+			setUserAnswer(answer);
+		}
+	};
 
 	const getButtonClass = (buttonAnswer: boolean) => {
+		// En modo examen, los botones no cambian de color.
+		if (isExamMode) return "true-false-button-qg";
+		
 		if (userAnswer === null) return "true-false-button-qg";
 		const correct = buttonAnswer === question.answer;
 		const selected = buttonAnswer === userAnswer;
@@ -37,15 +58,15 @@ const TrueFalseQuestion = ({ app, question }: TrueFalseQuestionProps) => {
 			<div className="true-false-container-qg">
 				<button
 					className={getButtonClass(true)}
-					onClick={() => setUserAnswer(true)}
-					disabled={userAnswer !== null}
+					onClick={() => handleAnswer(true)}
+					disabled={!isExamMode && userAnswer !== null}
 				>
 					True
 				</button>
 				<button
 					className={getButtonClass(false)}
-					onClick={() => setUserAnswer(false)}
-					disabled={userAnswer !== null}
+					onClick={() => handleAnswer(false)}
+					disabled={!isExamMode && userAnswer !== null}
 				>
 					False
 				</button>
